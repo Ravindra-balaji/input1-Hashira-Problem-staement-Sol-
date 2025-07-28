@@ -19,6 +19,7 @@ public class Main {
 
         int n = 0, k = 0;
         List<Point> points = new ArrayList<>();
+        List<Integer> invalidKeys = new ArrayList<>();
         String line;
 
         while ((line = reader.readLine()) != null) {
@@ -32,24 +33,58 @@ public class Main {
             } else if (line.matches("^\"\\d+\"\\s*:\\s*\\{")) {
                 int x = Integer.parseInt(line.replaceAll("[^0-9]", "").trim());
 
-                String baseLine = reader.readLine().trim();
-                String valueLine = reader.readLine().trim();
+                String baseLine = reader.readLine();
+                String valueLine = reader.readLine();
 
-                int base = Integer.parseInt(baseLine.split(":")[1].replaceAll("[^0-9]", "").trim());
-                String valueStr = valueLine.split(":")[1].replaceAll("[\"{},]", "").trim();
+                if (baseLine == null || valueLine == null)
+                    continue;
 
-                BigInteger y = new BigInteger(valueStr, base);
-                points.add(new Point(x, y));
+                baseLine = baseLine.trim();
+                valueLine = valueLine.trim();
+
+                try {
+                    int base = Integer.parseInt(baseLine.split(":")[1].replaceAll("[^0-9]", "").trim());
+                    String valueStr = valueLine.split(":")[1].replaceAll("[\"{},]", "").trim();
+
+                    BigInteger y = new BigInteger(valueStr, base);
+                    points.add(new Point(x, y));
+                } catch (Exception e) {
+                    invalidKeys.add(x);
+                }
             }
         }
 
         reader.close();
 
+        if (points.size() < k) {
+            System.out.println(
+                    "Not enough valid keys to reconstruct the secret. Needed: " + k + ", found: " + points.size());
+            if (!invalidKeys.isEmpty()) {
+                System.out.println("Invalid keys: " + invalidKeys);
+            }
+            return;
+        }
+
         points.sort(Comparator.comparingInt(p -> p.x));
         List<Point> selected = points.subList(0, k);
+        List<Integer> usedKeys = new ArrayList<>();
+        for (Point p : selected) {
+            usedKeys.add(p.x);
+        }
 
         BigInteger secret = lagrangeConstantTerm(selected);
-        System.out.println("Secret (constant term): " + secret.toString());
+        System.out.println("Secret (constant term): " + secret);
+
+        List<Integer> unusedInvalidKeys = new ArrayList<>();
+        for (int key : invalidKeys) {
+            if (!usedKeys.contains(key)) {
+                unusedInvalidKeys.add(key);
+            }
+        }
+
+        if (!unusedInvalidKeys.isEmpty()) {
+            System.out.println("Invalid keys not used in secret reconstruction: " + unusedInvalidKeys);
+        }
     }
 
     public static BigInteger lagrangeConstantTerm(List<Point> points) {
@@ -63,8 +98,8 @@ public class Main {
             for (int j = 0; j < points.size(); j++) {
                 if (i != j) {
                     BigInteger xj = BigInteger.valueOf(points.get(j).x);
-                    BigInteger numerator = xj.negate(); // -xj
-                    BigInteger denominator = xi.subtract(xj); // xi - xj
+                    BigInteger numerator = xj.negate();
+                    BigInteger denominator = xi.subtract(xj);
 
                     term = term.multiply(numerator).divide(denominator);
                 }
